@@ -1,32 +1,36 @@
-name: Build and Export Docker Image
+name: Build and Push to ACR
 
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:  # Allows manual trigger
+  workflow_dispatch:  # Allows manual trigger from Actions tab
 
 jobs:
-  build-and-export:
+  build-and-push:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Docker image
-        uses: docker/build-push-action@v5
+      - name: Azure Login
+        uses: azure/login@v1
         with:
-          context: .
-          file: ./Dockerfile
-          tags: contract-processor:v1
-          outputs: type=docker,dest=/tmp/contract-processor.tar
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-image
-          path: /tmp/contract-processor.tar
-          retention-days: 7
+      - name: Build and push to ACR
+        run: |
+          az acr build \
+            --registry ${{ secrets.ACR_NAME }} \
+            --image contract-processor:v1 \
+            --file Dockerfile \
+            .
+
+      - name: Verify image in ACR
+        run: |
+          echo "Verifying image was pushed successfully..."
+          az acr repository show \
+            --name ${{ secrets.ACR_NAME }} \
+            --repository contract-processor \
+            --output table
+          echo "✅ Image successfully pushed to ACR!"
