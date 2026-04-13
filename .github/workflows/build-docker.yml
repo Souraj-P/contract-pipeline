@@ -1,9 +1,9 @@
-name: Build and Push to ACR
+name: Build and Push to Docker Hub
 
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:  # Allows manual trigger from Actions tab
+  workflow_dispatch:
 
 jobs:
   build-and-push:
@@ -13,24 +13,26 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Azure Login
-        uses: azure/login@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push to ACR
-        run: |
-          az acr build \
-            --registry ${{ secrets.ACR_NAME }} \
-            --image contract-processor:v1 \
-            --file Dockerfile \
-            .
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/contract-processor:latest
 
-      - name: Verify image in ACR
+      - name: Image details
         run: |
-          echo "Verifying image was pushed successfully..."
-          az acr repository show \
-            --name ${{ secrets.ACR_NAME }} \
-            --repository contract-processor \
-            --output table
-          echo "✅ Image successfully pushed to ACR!"
+          echo "✅ Image successfully pushed to Docker Hub!"
+          echo "Image name: ${{ secrets.DOCKERHUB_USERNAME }}/contract-processor:latest"
+          echo ""
+          echo "You can now deploy to ACI with:"
+          echo "az container create --image ${{ secrets.DOCKERHUB_USERNAME }}/contract-processor:latest"
